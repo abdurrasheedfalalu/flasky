@@ -1,13 +1,16 @@
+import jwt
+from time import time
 from . import db, login_manager
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from flask import current_app
 from flask_login import UserMixin
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-class Role(UserMixin, db.Model):
+class Role(db.Model):
     __tablename__ = "roles"
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64), unique=True)
@@ -17,13 +20,14 @@ class Role(UserMixin, db.Model):
         return f"<Role {self.name} >"
     
 
-class User(db.Model):
+class User(UserMixin, db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(64), unique=True, index=True)
     username = db.Column(db.String(64), unique=True, index=True)
     role_id = db.Column(db.Integer, db.ForeignKey("roles.id"))
     password_hash = db.Column(db.String(128))
+    confirmed = db.Column(db.Boolean, default=False)
 
     @property
     def password(self):
@@ -35,6 +39,24 @@ class User(db.Model):
 
     def verify_password(self, password):
         return check_password_hash(self.password_hash, password)
+    
+
+
+    def generate_confirmation_token(self, expiration=3600):
+        payload = {'confirm': self.id, "exp": time() + expiration}
+        token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
+        return token
+    
+    def confirm(self, token):
+        try:
+            payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+        except:
+            return False  # Error occur
+        if payload.get('confirm') != self.id:
+            return False
+        self.confirmed = True
+        db.session.add(self)
+        return True
 
     def __repr__(self):
         return f"<User {self.username} >"
