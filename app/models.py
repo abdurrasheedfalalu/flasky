@@ -58,5 +58,48 @@ class User(UserMixin, db.Model):
         db.session.add(self)
         return True
 
+
+
+
+    def generate_reset_token(self, expiration=3600):
+        payload = {'reset': self.id, "exp": time() + expiration}
+        token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
+        return token
+
+    @staticmethod
+    def reset_password(token, new_password):
+        try:
+            data = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+        except:
+            return False
+        user = User.query.get(data.get('reset'))
+        if user is None:
+            return False
+        user.password = new_password
+        db.session.add(user)
+        return True
+
+    def generate_email_change_token(self, new_email, expiration=3600):
+        payload = {'change_email': self.id, "new_email": new_email, "exp": time() + expiration}
+        token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
+        return token
+
+    def change_email(self, token):
+        try:
+            data = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+        except:
+            return False
+        if data.get('change_email') != self.id:
+            return False
+        new_email = data.get('new_email')
+        if new_email is None:
+            return False
+        if self.query.filter_by(email=new_email).first() is not None:
+            return False
+        self.email = new_email
+        self.avatar_hash = self.gravatar_hash()
+        db.session.add(self)
+        return True
+
     def __repr__(self):
         return f"<User {self.username} >"
