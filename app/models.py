@@ -1,3 +1,4 @@
+from datetime import datetime
 import jwt
 from time import time
 from . import db, login_manager
@@ -28,7 +29,7 @@ class Role(db.Model):
     users = db.relationship("User", backref="role", lazy="dynamic")
 
     def __init__(self, **kwargs):
-        super("Role", self).__init__(**kwargs)
+        super(Role, self).__init__(**kwargs)
         if self.permissions is None:
             self.permissions = 0
 
@@ -49,7 +50,7 @@ class Role(db.Model):
     
 
     @staticmethod
-    def insert_role():
+    def insert_roles():
         roles = {
             "User": [
                 Permission.FOLLOW,Permission.WRITE,Permission.COMMENT
@@ -90,6 +91,11 @@ class User(UserMixin, db.Model):
     role_id = db.Column(db.Integer, db.ForeignKey("roles.id"))
     password_hash = db.Column(db.String(128))
     confirmed = db.Column(db.Boolean, default=False)
+    name = db.Column(db.String(64))
+    location = db.Column(db.String(64))
+    about_me = db.Column(db.Text())
+    member_since = db.Column(db.DateTime(), default=datetime.utcnow)
+    last_since = db.Column(db.DateTime(), default=datetime.utcnow)
 
     @property
     def password(self):
@@ -170,6 +176,12 @@ class User(UserMixin, db.Model):
     
     def is_administrator(self):
         return self.can(Permission.ADMIN)
+    
+
+    def ping(self):
+        self.last_seen = datetime.utcnow()
+        db.session.add(self)
+        db.session.commit()
 
 
     def __repr__(self):

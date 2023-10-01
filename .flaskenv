@@ -1,0 +1,3 @@
+FLASK_APP=flasky.py
+
+FLASK_DEBUG=1
